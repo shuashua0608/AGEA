@@ -2,6 +2,9 @@
 
 Official implementation for [Query-Efficient Agentic Graph Extraction Attacks on GraphRAG Systems](https://arxiv.org/pdf/2601.14662) (ACL Main 2026), with unified runners for GraphRAG and LightRAG.
 
+![Framework](https://github.com/user-attachments/assets/7b3c1587-1efa-49fe-a7be-38c0086e4835)
+
+  
 ## Quick Start
 
 ### 1. Install dependencies
