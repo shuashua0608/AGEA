@@ -1,0 +1,11 @@
+.env
+*.env
+**/.env
+*.pem
+*.key
+__pycache__/
+*.pyc
+LightRAG/graphs/
+graphrag/**/output/
+graphrag/**/input/
+*.parquet
