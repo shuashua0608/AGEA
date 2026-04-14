@@ -212,21 +212,88 @@ def parse_llm_response_for_graph_items(
     return uniq_nodes_by_label(nodes), uniq_edges_by_triple(edges)
 
 
+def parse_keep_discard_decisions(
+    candidate_nodes: List[Dict[str, Any]],
+    candidate_edges: List[Dict[str, Any]],
+    decision_text: str,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], bool]:
+    """
+    Parse KEEP/DISCARD decisions using the exact split-based logic from the
+    original verify_update runner.
+
+    Returns:
+        (kept_nodes, kept_edges, found_decision_markers)
+    """
+    kept_nodes: List[Dict[str, Any]] = []
+    kept_edges: List[Dict[str, Any]] = []
+
+    lines = decision_text.split('\n')
+
+    node_map = {node.get('label', node.get('id', '')): node for node in candidate_nodes}
+    edge_map: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for edge in candidate_edges:
+        source = edge.get('source', edge.get('src', ''))
+        target = edge.get('target', edge.get('dst', ''))
+        edge_map[(source, target)] = edge
+
+    found_decision_markers = False
+
+    for line in lines:
+        line_upper = line.upper()
+        if 'ENTITY:' in line_upper and ('->' in line):
+            parts = line.split('->')
+            if len(parts) >= 2:
+                found_decision_markers = True
+                entity_name = parts[0].replace('ENTITY:', '').strip()
+                decision = parts[-1].strip().upper()
+                if decision == 'KEEP' and entity_name in node_map:
+                    kept_nodes.append(node_map[entity_name])
+        elif 'RELATIONSHIP:' in line_upper and ('->' in line):
+            parts = line.split('->')
+            if len(parts) >= 3:
+                found_decision_markers = True
+                source = parts[0].replace('RELATIONSHIP:', '').strip()
+                target = parts[1].strip()
+                decision = parts[-1].strip().upper()
+                if decision == 'KEEP' and (source, target) in edge_map:
+                    kept_edges.append(edge_map[(source, target)])
+
+    return kept_nodes, kept_edges, found_decision_markers
+
+
 def is_valid_entity(node: str) -> bool:
+    """
+    Check if a node is a valid entity for exploitation.
+    Restored to match the original verify_update runner exactly.
+    """
     generic_terms = {
-        "NA",
-        "N/A",
-        "NULL",
+        "SUMMARY",
+        "ORGANIZATIONS",
+        "ROLES",
+        "OVERVIEW",
         "ENTITY NAME",
         "ENTITY",
         "RELATIONSHIPS",
         "ENTITIES",
+        "REPORTS",
+        "INFORMATION",
+        "DATA",
+        "CONTENT",
+        "UNKNOWN",
+        "N/A",
+        "NULL",
+        "EMPTY",
     }
     if len(node.strip()) < 2:
         return False
-    if node.upper().strip() in generic_terms:
+    if (
+        node.startswith("ENTITIES (")
+        or node.startswith("RELATIONSHIPS (")
+        or node.startswith("REPORTS (")
+        or (node.startswith("[") and node.endswith("]"))
+    ):
         return False
-    if node.startswith("[") and node.endswith("]"):
+    if node.upper().strip() in generic_terms:
         return False
     return True
 

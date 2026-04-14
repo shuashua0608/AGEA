@@ -38,6 +38,7 @@ from utils import (
     get_top_hubs as util_get_top_hubs,
     load_original_graph_data,
     normalize_node_label,
+    parse_keep_discard_decisions as util_parse_keep_discard_decisions,
     parse_llm_response_for_graph_items as util_parse_llm_response_for_graph_items,
     setup_dataset_paths as util_setup_dataset_paths,
     setup_memory_paths as util_setup_memory_paths,
@@ -484,51 +485,11 @@ def filter_extraction_with_graph_filter_agent(
 
         decision_text = response.choices[0].message.content or ""
 
-        node_map = {
-            normalize_node_label(node.get("label", node.get("id", ""))): node for node in candidate_nodes
-        }
-        edge_map = {
-            (
-                normalize_node_label(edge.get("source", edge.get("src", ""))),
-                normalize_node_label(edge.get("target", edge.get("dst", ""))),
-            ): edge
-            for edge in candidate_edges
-        }
-
-        kept_nodes: List[Dict[str, Any]] = []
-        kept_edges: List[Dict[str, Any]] = []
-        found_decisions = False
-
-        for line in decision_text.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-
-            entity_match = None
-            rel_match = None
-            import re
-
-            entity_match = re.match(r"^ENTITY:\s*(.*?)\s*->\s*(KEEP|DISCARD)\s*$", line, re.IGNORECASE)
-            if entity_match:
-                found_decisions = True
-                label = normalize_node_label(entity_match.group(1))
-                decision = entity_match.group(2).upper()
-                if decision == "KEEP" and label in node_map:
-                    kept_nodes.append(node_map[label])
-                continue
-
-            rel_match = re.match(
-                r"^RELATIONSHIP:\s*(.*?)\s*->\s*(.*?)\s*->\s*(KEEP|DISCARD)\s*$",
-                line,
-                re.IGNORECASE,
-            )
-            if rel_match:
-                found_decisions = True
-                src = normalize_node_label(rel_match.group(1))
-                dst = normalize_node_label(rel_match.group(2))
-                decision = rel_match.group(3).upper()
-                if decision == "KEEP" and (src, dst) in edge_map:
-                    kept_edges.append(edge_map[(src, dst)])
+        kept_nodes, kept_edges, found_decisions = util_parse_keep_discard_decisions(
+            candidate_nodes,
+            candidate_edges,
+            decision_text,
+        )
 
         if not found_decisions and (candidate_nodes or candidate_edges):
             kept_nodes = candidate_nodes

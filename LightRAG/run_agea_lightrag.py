@@ -41,6 +41,7 @@ from utils import (
     get_llm_model_name as util_get_llm_model_name,
     get_top_hubs as util_get_top_hubs,
     normalize_node_label,
+    parse_keep_discard_decisions as util_parse_keep_discard_decisions,
     parse_llm_response_for_graph_items as util_parse_llm_response_for_graph_items,
     setup_dataset_paths as util_setup_dataset_paths,
     setup_memory_paths as util_setup_memory_paths,
@@ -476,47 +477,12 @@ def filter_extraction_with_graph_filter_agent(
         
         graph_filter_response = response.choices[0].message.content
         
-        # Parse graph-filter response to extract KEEP/DISCARD decisions
-        filtered_nodes = []
-        filtered_edges = []
-        
-        # Simple parsing: look for KEEP/DISCARD markers
-        lines = graph_filter_response.split('\n')
-        
-        node_map = {node.get('label', node.get('id', '')): node for node in candidate_nodes}
-        edge_map = {}
-        for edge in candidate_edges:
-            source = edge.get('source', edge.get('src', ''))
-            target = edge.get('target', edge.get('dst', ''))
-            edge_map[(source, target)] = edge
-        
-        # Track if we found any KEEP/DISCARD markers (to detect true parsing failures)
-        found_decision_markers = False
-        
-        for line in lines:
-            line_upper = line.upper()
-            if 'ENTITY:' in line_upper and ('->' in line):
-                # Parse entity decision
-                parts = line.split('->')
-                if len(parts) >= 2:
-                    found_decision_markers = True
-                    entity_name = parts[0].replace('ENTITY:', '').strip()
-                    decision = parts[-1].strip().upper()
-                    # Only add if it's in our candidate list (new items sent for graph filtering)
-                    if decision == 'KEEP' and entity_name in node_map:
-                        filtered_nodes.append(node_map[entity_name])
-            elif 'RELATIONSHIP:' in line_upper and ('->' in line):
-                # Parse relationship decision
-                parts = line.split('->')
-                if len(parts) >= 3:
-                    found_decision_markers = True
-                    source = parts[0].replace('RELATIONSHIP:', '').strip()
-                    target = parts[1].strip()
-                    decision = parts[-1].strip().upper()
-                    # Only add if it's in our candidate list (new items sent for graph filtering)
-                    if decision == 'KEEP' and (source, target) in edge_map:
-                        filtered_edges.append(edge_map[(source, target)])
-        
+        filtered_nodes, filtered_edges, found_decision_markers = util_parse_keep_discard_decisions(
+            candidate_nodes,
+            candidate_edges,
+            graph_filter_response,
+        )
+
         if not found_decision_markers and (candidate_nodes or candidate_edges):
             print("  ⚠️  Graph filter parsing failed: No KEEP/DISCARD markers found, using original candidates")
             filtered_nodes = candidate_nodes
