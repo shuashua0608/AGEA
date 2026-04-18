@@ -1,4 +1,4 @@
-# AGEA (Agentic Graph Extraction Attack)
+# AGEA: Query-Efficient Agentic Graph Extraction Attacks on GraphRAG Systems
 
 Official implementation for [Query-Efficient Agentic Graph Extraction Attacks on GraphRAG Systems](https://arxiv.org/pdf/2601.14662) (ACL Main 2026), with unified runners for GraphRAG and LightRAG.
 
